@@ -3,4 +3,4 @@ dist
 .vite
 npm-debug.log*
 vite-dev*.log
-fire-questionnaire.jsx
+/fire-questionnaire.jsx

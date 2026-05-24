@@ -4,7 +4,7 @@ import HomePage from "./src/HomePage.jsx";
 import Navbar from "./src/Navbar.jsx";
 import QuizPage from "./src/QuizPage.jsx";
 import StandardFire from "./src/calculators/StandardFire.jsx";
-import FireQuestionnaire from "./src/fire-questionnaire.jsx";
+import FireQuestionnaire from "./src/FireQuestionnaire.jsx";
 
 export default function App() {
   return (
