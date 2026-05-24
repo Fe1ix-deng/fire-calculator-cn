@@ -1,0 +1,6 @@
+node_modules
+dist
+.vite
+npm-debug.log*
+vite-dev*.log
+fire-questionnaire.jsx
