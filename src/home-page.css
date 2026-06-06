@@ -51,6 +51,7 @@ button {
 .site-navbar {
   position: relative;
   z-index: 100;
+  display: flex;
 }
 
 .home-logo {
@@ -443,6 +444,71 @@ button {
   cursor: default;
 }
 
+.quiz-number-wrap {
+  display: flex;
+  justify-content: center;
+  margin-top: 48px;
+}
+
+.quiz-number-row {
+  display: flex;
+  align-items: center;
+  gap: 48px;
+}
+
+.quiz-number-button {
+  width: 64px;
+  height: 64px;
+  border: 1px solid var(--home-line);
+  border-radius: 50%;
+  background: #ffffff;
+  color: var(--home-muted);
+  cursor: pointer;
+  font-size: 28px;
+  line-height: 1;
+  box-shadow: 0 8px 18px rgba(93, 70, 48, 0.06);
+}
+
+.quiz-number-button:active {
+  border-color: var(--home-accent);
+  background: #fffaf3;
+  color: var(--home-accent);
+}
+
+.quiz-number-display {
+  min-width: 220px;
+  text-align: center;
+}
+
+.quiz-number-value {
+  color: var(--home-text);
+  font-family: "Noto Serif SC", "Songti SC", "STSong", serif;
+  font-size: clamp(58px, 8vw, 82px);
+  font-weight: 600;
+  line-height: 0.9;
+}
+
+.quiz-number-unit {
+  margin-top: 8px;
+  color: var(--home-muted);
+  font-size: 20px;
+}
+
+.quiz-next-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: min(320px, 100%);
+  min-height: 54px;
+  margin: 48px auto 0;
+  border: 0;
+  border-radius: 14px;
+  background: var(--home-accent);
+  color: #ffffff;
+  cursor: pointer;
+  font-weight: 800;
+}
+
 .quiz-points {
   display: grid;
   gap: 12px;
@@ -478,6 +544,11 @@ button {
 }
 
 @media (max-width: 760px) {
+  .home-nav {
+    width: min(100% - 28px, 1120px);
+    padding: 16px 0;
+  }
+
   .hero {
     padding: 64px 0 48px;
   }
@@ -488,6 +559,22 @@ button {
 
   .navbar-center {
     display: none;
+  }
+
+  .home-logo,
+  .nav-cta {
+    flex: 0 0 auto;
+  }
+
+  .home-logo {
+    font-size: 17px;
+  }
+
+  .nav-cta {
+    min-height: 42px;
+    padding: 0 14px;
+    border-radius: 10px;
+    white-space: nowrap;
   }
 
   .calculator-grid {
@@ -709,9 +796,17 @@ button {
   font-style: normal;
 }
 
+.fire-field em {
+  color: #7a6f65;
+}
+
 .slider-field input[type="range"] {
   width: 100%;
   accent-color: #c05c0a;
+}
+
+.savings-rate-field {
+  grid-column: 1 / -1;
 }
 
 .slider-ends {
@@ -730,6 +825,35 @@ button {
 
 .china-form {
   margin-top: 16px;
+}
+
+.property-equity-field {
+  display: grid;
+  gap: 12px;
+}
+
+.property-equity-check {
+  display: grid;
+  grid-template-columns: 20px 1fr;
+  gap: 10px;
+  align-items: start;
+  min-height: 48px;
+  border: 1px solid #e8e0d4;
+  border-radius: 12px;
+  padding: 14px;
+  background: #fffaf3;
+  color: #4f463e;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.property-equity-check input {
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  accent-color: #c05c0a;
 }
 
 .result-stack {
@@ -770,6 +894,52 @@ button {
   color: #c05c0a;
 }
 
+.goal-comparison-card {
+  padding: 20px;
+}
+
+.goal-ages {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.goal-ages div {
+  border: 1px solid #e8e0d4;
+  border-radius: 14px;
+  padding: 14px;
+  background: #fffaf3;
+}
+
+.goal-ages span {
+  display: block;
+  color: #7a6f65;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.goal-ages strong {
+  display: block;
+  margin-top: 10px;
+  color: #1c1814;
+  font-size: 28px;
+  line-height: 1;
+}
+
+.goal-status {
+  margin: 14px 0 0;
+  font-weight: 800;
+  line-height: 1.6;
+}
+
+.goal-status.on-track {
+  color: #2a6049;
+}
+
+.goal-status.behind {
+  color: #c05c0a;
+}
+
 .mini-chart-card p,
 .explanation-card p {
   margin: 0;
@@ -778,13 +948,39 @@ button {
   line-height: 1.85;
 }
 
+.sustainability-note {
+  color: #7a6f65;
+  font-size: 14px;
+}
+
 .chart-card {
   margin-bottom: 18px;
 }
 
 .chart-wrap {
   width: 100%;
-  min-height: 360px;
+  height: 350px;
+}
+
+.chart-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  color: #d3452f;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.chart-note-text {
+  line-height: 1.7;
+}
+
+.fire-target-key {
+  width: 28px;
+  flex: 0 0 auto;
+  height: 0;
+  border-top: 2px dashed #d3452f;
 }
 
 @media (max-width: 980px) {
@@ -802,6 +998,10 @@ button {
 @media (max-width: 620px) {
   .standard-fire-page {
     padding: 16px;
+  }
+
+  .chart-wrap {
+    height: 250px;
   }
 
   .progress-heading,

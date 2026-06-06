@@ -2,7 +2,7 @@ import { Link, useLocation } from "react-router-dom";
 
 const navItems = [
   { label: "计算器", to: "/calculators", match: (path) => path.startsWith("/calculator") || path === "/calculators" },
-  { label: "快速测试", to: "/quiz", match: (path) => path === "/quiz" },
+  { label: "深度评估", to: "/questionnaire", match: (path) => path === "/questionnaire" },
 ];
 
 export default function Navbar() {
@@ -20,8 +20,8 @@ export default function Navbar() {
           </Link>
         ))}
       </div>
-      <Link className="nav-cta" to="/questionnaire">
-        深度评估
+      <Link className="nav-cta" to="/quiz">
+        快速测试
       </Link>
     </nav>
   );

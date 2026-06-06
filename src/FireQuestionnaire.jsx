@@ -1,5 +1,6 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAppData } from "./AppContext.jsx";
 
 // ─── STYLES ──────────────────────────────────────────────────────────────────
 const CSS = `
@@ -413,6 +414,139 @@ input[type=range]::-moz-range-thumb {
 .btn-next:disabled { opacity: 0.35; cursor: not-allowed; }
 .btn-next:not(:disabled):active { transform: scale(0.98); opacity: 0.9; }
 
+/* ─── Report screen ──────── */
+.report-wrap {
+  flex: 1;
+  padding: 32px 20px 48px;
+}
+.report-kicker {
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  margin-bottom: 10px;
+}
+.report-title {
+  font-family: 'Noto Serif SC', serif;
+  color: var(--text);
+  font-size: 30px;
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+}
+.report-subtitle {
+  margin-top: 10px;
+  color: var(--text-2);
+  font-size: 16px;
+  line-height: 1.65;
+}
+.report-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 9px;
+  margin-top: 26px;
+}
+.report-metric {
+  min-width: 0;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 13px 10px;
+}
+.report-metric-label {
+  min-height: 34px;
+  color: var(--text-2);
+  font-size: 12px;
+  line-height: 1.4;
+  font-weight: 600;
+}
+.report-metric-value {
+  margin-top: 12px;
+  color: var(--text);
+  font-family: 'Noto Serif SC', serif;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.1;
+  word-break: keep-all;
+}
+.report-metric-value.accent {
+  color: var(--accent);
+  font-size: 23px;
+}
+.risk-card {
+  margin-top: 24px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 20px;
+}
+.risk-card h2 {
+  font-family: 'Noto Serif SC', serif;
+  font-size: 21px;
+  font-weight: 600;
+  margin-bottom: 14px;
+}
+.risk-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.risk-item {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+.risk-item:first-child { padding-top: 0; border-top: none; }
+.risk-icon {
+  line-height: 1.4;
+  font-size: 19px;
+}
+.risk-title {
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 5px;
+}
+.risk-text {
+  color: var(--text-2);
+  font-size: 14px;
+  line-height: 1.65;
+}
+.report-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 24px;
+}
+.btn-report-primary,
+.btn-report-secondary {
+  width: 100%;
+  min-height: 54px;
+  border-radius: 14px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  transition: transform 0.1s, opacity 0.15s;
+}
+.btn-report-primary {
+  border: none;
+  background: var(--accent);
+  color: white;
+}
+.btn-report-secondary {
+  border: 1.5px solid var(--accent);
+  background: transparent;
+  color: var(--accent);
+}
+.btn-report-primary:active,
+.btn-report-secondary:active {
+  transform: scale(0.985);
+  opacity: 0.9;
+}
+
 /* ─── Done screen ────────── */
 .done-wrap {
   flex: 1; display: flex; flex-direction: column;
@@ -550,7 +684,7 @@ const Qs = [
     type:"slider", min:1000, max:30000, step:500, unit:"元", def:6000,
     hint:"用今天的物价估算，系统会自动考虑通胀", cond:()=>true },
   { id:"retire_house", mod:"支出情况", q:"退休后你的住房成本大概是？",
-    type:"single", opts:["有自有住房，无租金或房贷","可能还需租房，月租1000-2000元","可能还需租房，月租2000元以上","现在完全不确定"], cond:()=>true },
+    type:"single", opts:["有自有住房，无租金或房贷","可能还需租房，月租3000元以内","可能还需租房，月租3000元以上","现在完全不确定"], cond:()=>true },
   { id:"big_exp",      mod:"支出情况", q:"未来5年内，有这些大额支出计划吗？",
     type:"multi", exclusiveOpt:"没有明确的大额计划",
     opts:["子女教育大额支出","父母大额医疗","创业或投资新项目","装修、婚礼或搬家","其他一次性大额支出","没有明确的大额计划"], cond:()=>true },
@@ -562,13 +696,14 @@ const Qs = [
   { id:"ss_15yr",   mod:"社保公积金", q:"考虑到你计划提前退休，能缴满15年吗？",
     type:"single", opts:["没问题，年限够用","需要规划，有点卡","可能有缺口，不确定","不打算依赖养老金，会自己安排"],
     cond:a=>a.ss_years && a.ss_years!=="15年以上" },
+  { id:"pension_cover", mod:"社保公积金", q:"你预计养老金能覆盖退休后多少生活费？",
+    type:"single", opts:["基本不把养老金算进计划","20%以下","20-40%","40%以上","不确定"],
+    hint:"不用精算，先判断它在你FIRE计划里的重要性",
+    cond:a=>a.ss_15yr !== "不打算依赖养老金，会自己安排" },
   { id:"gjj_bal",   mod:"社保公积金", q:"你的住房公积金账户余额大约是多少？",
     type:"slider", min:0, max:500000, step:5000, unit:"元", def:30000, cond:()=>true },
   { id:"gjj_plan",  mod:"社保公积金", q:"公积金你打算怎么用？",
-    type:"single", opts:["购房或偿还房贷","退休后提取备用","还没规划"], cond:()=>true },
-  { id:"pension_cover", mod:"社保公积金", q:"你预计养老金能覆盖退休后多少生活费？",
-    type:"single", opts:["基本不把养老金算进计划","20%以下","20-40%","40%以上","不确定"],
-    hint:"不用精算，先判断它在你FIRE计划里的重要性", cond:()=>true },
+    type:"single", opts:["购房或偿还房贷","退休后提取备用","还没规划"], cond:a=>Number(a.gjj_bal ?? 30000) > 0 },
 
   // ── 资产负债 ────────────────────────────────────────────────────────────
   { id:"prop_cnt",  mod:"资产负债", q:"你名下有几套房？",
@@ -685,6 +820,132 @@ const isAnswered = (q, answers) => {
 };
 
 const getVisible = answers => Qs.filter(q => q.cond(answers));
+
+const currentYear = new Date().getFullYear();
+
+const getDefault = id => Qs.find(q => q.id === id)?.def ?? 0;
+const getAmount = (answers, id) => Number(answers[id] ?? getDefault(id)) || 0;
+const containsText = (value, keyword) => {
+  if (Array.isArray(value)) return value.some(item => String(item).includes(keyword));
+  return String(value ?? "").includes(keyword);
+};
+
+const sumExpenses = expenses =>
+  EXP_ITEMS.reduce((sum, item) => sum + (Number(expenses?.[item.key]) || 0), 0);
+
+const getExpectedReturn = answers => {
+  const raw = answers.expected_return ?? answers.exp_return;
+  const choice = typeof raw === "string" ? raw : raw?.choice;
+  if (choice === "其他") return Math.max(0, Number(raw?.custom) || 0) / 100;
+  if (choice?.startsWith("2%以下")) return 0.02;
+  if (choice?.startsWith("2-4%")) return 0.03;
+  if (choice?.startsWith("4-6%")) return 0.05;
+  if (choice?.startsWith("6%以上")) return 0.07;
+  return 0.05;
+};
+
+const getExpectedReturnPercent = answers => Math.round(getExpectedReturn(answers) * 100);
+
+const calcYearsToTarget = ({ currentAssets, monthlySavings, target, annualReturn }) => {
+  if (target <= 0 || currentAssets >= target) return 0;
+  const monthlyReturn = annualReturn / 12;
+  let assets = Math.max(0, currentAssets);
+  for (let month = 1; month <= 960; month += 1) {
+    assets = assets * (1 + monthlyReturn) + monthlySavings;
+    if (assets >= target) return month / 12;
+  }
+  return 80;
+};
+
+const getReport = answers => {
+  const retireExp = getAmount(answers, "retire_exp");
+  const fireTarget = retireExp * 12 / 0.04;
+  const propertyValue = getAmount(answers, "prop_val");
+  const propertyDebt = answers.prop_cnt?.includes("有房贷") ? getAmount(answers, "prop_debt") : 0;
+  const propertyNet = answers.prop_cnt && answers.prop_cnt !== "没有"
+    ? Math.max(0, propertyValue - propertyDebt)
+    : 0;
+  const currentAssets = getAmount(answers, "fin_assets") + getAmount(answers, "gjj_bal") + propertyNet;
+  const monthlySavings = getAmount(answers, "income") - sumExpenses(answers.expenses);
+  const years = calcYearsToTarget({
+    currentAssets,
+    monthlySavings,
+    target: fireTarget,
+    annualReturn: getExpectedReturn(answers),
+  });
+  const yearsRounded = Math.ceil(years);
+  const age = getAmount(answers, "age");
+  const fireAge = age + yearsRounded;
+  const progress = fireTarget > 0 ? Math.min(999, Math.round(currentAssets / fireTarget * 100)) : 0;
+
+  return {
+    fireTarget,
+    currentAssets,
+    monthlySavings,
+    yearsRounded,
+    fireAge,
+    fireYear: currentYear + yearsRounded,
+    progress,
+  };
+};
+
+const getQuestionnaireSharedData = answers => {
+  const propertyValue = getAmount(answers, "prop_val");
+  const propertyDebt = answers.prop_cnt?.includes("有房贷") ? getAmount(answers, "prop_debt") : 0;
+  const propertyNet = answers.prop_cnt && answers.prop_cnt !== "没有"
+    ? Math.max(0, propertyValue - propertyDebt)
+    : 0;
+
+  return {
+    age: getAmount(answers, "age"),
+    fire_age: getAmount(answers, "fire_age"),
+    monthly_income: getAmount(answers, "income"),
+    monthly_savings: getAmount(answers, "income") - sumExpenses(answers.expenses),
+    retire_expense: getAmount(answers, "retire_exp"),
+    financial_assets: getAmount(answers, "fin_assets"),
+    gjj_balance: getAmount(answers, "gjj_bal"),
+    property_net: propertyNet,
+    expected_return: getExpectedReturnPercent(answers),
+    pension_monthly: 0,
+  };
+};
+
+const getRiskPoints = answers => {
+  const risks = [];
+  if (containsText(answers.par_med, "较弱") || containsText(answers.par_med, "薄弱")) {
+    risks.push({
+      title: "父母医疗保障薄弱",
+      text: "父母目前缺乏商业医疗险，一次大病可能消耗你数月积蓄，建议尽早为父母配置百万医疗险，年保费约1500-2500元。",
+    });
+  }
+  if (containsText(answers.com_ins, "没有买过")) {
+    risks.push({
+      title: "本人保险缺口",
+      text: "你目前没有任何商业保险，建议优先购买百万医疗险和重疾险，两者合计年保费约3000-5000元，可覆盖主要健康风险。",
+    });
+  }
+  const expectedReturn = answers.expected_return ?? answers.exp_return;
+  const expectedChoice = typeof expectedReturn === "string" ? expectedReturn : expectedReturn?.choice;
+  if (expectedChoice?.startsWith("2%以下")) {
+    risks.push({
+      title: "投资收益率偏低",
+      text: "当前以存款为主的策略，实际收益可能跑不赢通胀，建议了解指数基金定投，长期年化收益率通常在5-7%之间。",
+    });
+  }
+  if (containsText(answers.stability, "职业年龄风险")) {
+    risks.push({
+      title: "职业收入持续性风险",
+      text: "你所在行业存在明显的年龄压力，建议提前规划副业或技能转型，避免收入中断对FIRE路径造成冲击。",
+    });
+  }
+  if (answers.ss_years === "3年以下" && containsText(answers.ss_15yr, "缺口")) {
+    risks.push({
+      title: "社保年限可能不足",
+      text: "按当前缴纳年限，退休前可能无法凑满领取养老金所需的15年，建议提前规划补缴或以灵活就业身份继续缴纳。",
+    });
+  }
+  return risks.slice(0, 2);
+};
 
 // ─── SUB-COMPONENTS ───────────────────────────────────────────────────────────
 
@@ -870,10 +1131,74 @@ function ReturnSelect({ q, value, onChange }) {
   );
 }
 
+function ReportPage({ report, risks, onRestart, onCalculator }) {
+  return (
+    <div className="app">
+      <main className="report-wrap">
+        <section>
+          <div className="report-kicker">你的 FIRE 评估报告</div>
+          <h1 className="report-title">你大约在 {report.fireAge} 岁实现财务自由</h1>
+          <p className="report-subtitle">
+            还需要约 {report.yearsRounded} 年，预计 {report.fireYear} 年
+          </p>
+        </section>
+
+        <section className="report-metrics" aria-label="核心指标">
+          <div className="report-metric">
+            <div className="report-metric-label">FIRE 目标金额</div>
+            <div className="report-metric-value accent">{fmt(Math.round(report.fireTarget / 10000))}万</div>
+          </div>
+          <div className="report-metric">
+            <div className="report-metric-label">当前进度</div>
+            <div className="report-metric-value">{report.progress}%</div>
+          </div>
+          <div className="report-metric">
+            <div className="report-metric-label">月储蓄额</div>
+            <div className="report-metric-value">{fmt(Math.max(0, report.monthlySavings))}元</div>
+          </div>
+        </section>
+
+        <section className="risk-card">
+          <h2>需要关注的事</h2>
+          <div className="risk-list">
+            {risks.length > 0 ? risks.map(risk => (
+              <article className="risk-item" key={risk.title}>
+                <div className="risk-icon">⚠️</div>
+                <div>
+                  <div className="risk-title">{risk.title}</div>
+                  <p className="risk-text">{risk.text}</p>
+                </div>
+              </article>
+            )) : (
+              <article className="risk-item">
+                <div className="risk-icon">⚠️</div>
+                <div>
+                  <div className="risk-title">暂未发现高优先级风险</div>
+                  <p className="risk-text">你当前的关键风险项没有触发预警，后续可以用详细计算器继续校准资产、支出和收益率假设。</p>
+                </div>
+              </article>
+            )}
+          </div>
+        </section>
+
+        <div className="report-actions">
+          <button className="btn-report-primary" type="button" onClick={onCalculator}>
+            去用 FIRE 计算器，算出详细数字 →
+          </button>
+          <button className="btn-report-secondary" type="button" onClick={onRestart}>
+            重新填写
+          </button>
+        </div>
+      </main>
+    </div>
+  );
+}
+
 // ─── MAIN ────────────────────────────────────────────────────────────────────
 
 export default function FireQuestionnaire() {
   const navigate = useNavigate();
+  const { updateData } = useAppData();
   const [answers,    setAnswers]    = useState({});
   const [currentId,  setCurrentId]  = useState(Qs[0].id);
   const [history,    setHistory]    = useState([]);
@@ -881,6 +1206,8 @@ export default function FireQuestionnaire() {
   const [animKey,    setAnimKey]    = useState(0);
   const [done,       setDone]       = useState(false);
 
+  const report = useMemo(() => getReport(answers), [answers]);
+  const risks = useMemo(() => getRiskPoints(answers), [answers]);
   const visible  = getVisible(answers);
   const currentQ = Qs.find(q => q.id === currentId);
   const cidx     = visible.findIndex(q => q.id === currentId);
@@ -898,12 +1225,16 @@ export default function FireQuestionnaire() {
     if (!isAnswered(currentQ, a)) return;
     const vis = getVisible(a);
     const ni = vis.findIndex(q => q.id === currentId) + 1;
-    if (ni >= vis.length) { setDone(true); return; }
+    if (ni >= vis.length) {
+      updateData(getQuestionnaireSharedData(a));
+      setDone(true);
+      return;
+    }
     setHistory(h => [...h, currentId]);
     setDirection("forward");
     setAnimKey(k => k + 1);
     setCurrentId(vis[ni].id);
-  }, [answers, currentId, currentQ]);
+  }, [answers, currentId, currentQ, updateData]);
 
   const goBack = useCallback(() => {
     if (!history.length) return;
@@ -914,29 +1245,25 @@ export default function FireQuestionnaire() {
     setCurrentId(prev);
   }, [history]);
 
+  const restart = useCallback(() => {
+    setAnswers({});
+    setCurrentId(Qs[0].id);
+    setHistory([]);
+    setDirection("forward");
+    setAnimKey(k => k + 1);
+    setDone(false);
+  }, []);
+
   if (done) {
-    const totalAnswered = Object.keys(answers).length;
     return (
       <>
         <style>{CSS}</style>
-        <div className="app">
-          <div className="done-wrap">
-            <div className="done-icon">🔥</div>
-            <div className="done-title">问卷完成了</div>
-            <div className="done-sub">
-              你回答了 {totalAnswered} 个问题，我们已经收集到足够的信息，正在准备为你生成专属报告。
-            </div>
-            <div className="done-card">
-              <div className="done-card-title">你的免费报告将包含</div>
-              {["FIRE目标金额测算", "预计达到FIRE的年龄", "你的2个最关键风险点", "与同类人群的横向对比"].map(t => (
-                <div key={t} className="done-item"><div className="done-dot"/>{t}</div>
-              ))}
-            </div>
-            <button className="btn-generate" onClick={() => navigate("/")}>
-              生成我的报告 →
-            </button>
-          </div>
-        </div>
+        <ReportPage
+          report={report}
+          risks={risks}
+          onRestart={restart}
+          onCalculator={() => navigate("/calculator/standard")}
+        />
       </>
     );
   }

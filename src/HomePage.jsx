@@ -2,9 +2,9 @@ import { Link } from "react-router-dom";
 
 const features = [
   {
-    icon: "🇨🇳",
-    title: "考虑中国国情",
-    text: "社保、公积金、父母赡养、房产",
+    icon: "🏠",
+    title: "本土化设计",
+    text: "社保、公积金、父母赡养、房产全纳入计算",
   },
   {
     icon: "🧭",

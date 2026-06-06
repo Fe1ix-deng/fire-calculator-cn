@@ -1,27 +1,46 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { useAppData } from "./AppContext.jsx";
 
 const questions = [
   {
     id: "age",
     title: "你今年多大？",
-    options: ["25岁以下", "25-30岁", "31-35岁", "36-40岁", "40岁以上"],
+    type: "number",
+    min: 18,
+    max: 65,
+    unit: "岁",
+    defaultValue: 28,
   },
   {
     id: "retireAge",
     title: "你希望几岁退休？",
-    options: ["40岁前", "40-45岁", "45-50岁", "50-55岁", "55岁以后"],
+    type: "number",
+    min: 30,
+    max: 75,
+    unit: "岁",
+    defaultValue: 50,
   },
   {
     id: "assets",
     title: "你现在有多少金融资产？",
     hint: "存款、基金、股票等全部加起来",
-    options: ["10万以下", "10-50万", "50-150万", "150-500万", "500万以上"],
+    type: "number",
+    min: 0,
+    max: 1000,
+    step: 5,
+    unit: "万元",
+    defaultValue: 30,
   },
   {
     id: "income",
-    title: "你的税后年收入大概是多少？",
-    options: ["10万以下", "10-20万", "20-40万", "40-80万", "80万以上"],
+    title: "你的税后月收入大概是多少？",
+    type: "number",
+    min: 0,
+    max: 100000,
+    step: 500,
+    unit: "元/月",
+    defaultValue: 10000,
   },
   {
     id: "spending",
@@ -79,6 +98,7 @@ const resultCopy = {
 };
 
 export default function QuizPage() {
+  const { updateData } = useAppData();
   const [index, setIndex] = useState(0);
   const [answers, setAnswers] = useState({});
   const [pendingOption, setPendingOption] = useState(null);
@@ -90,11 +110,32 @@ export default function QuizPage() {
   const choose = (option) => {
     if (pendingOption) return;
     setPendingOption(option);
-    setAnswers((currentAnswers) => ({ ...currentAnswers, [current.id]: option }));
+    const nextAnswers = { ...answers, [current.id]: option };
+    setAnswers(nextAnswers);
     window.setTimeout(() => {
+      if (index === questions.length - 1) {
+        updateData(getQuizSharedData(nextAnswers));
+      }
       setIndex((currentIndex) => currentIndex + 1);
       setPendingOption(null);
     }, 280);
+  };
+
+  const setNumberAnswer = (value) => {
+    setAnswers((currentAnswers) => ({ ...currentAnswers, [current.id]: value }));
+  };
+
+  const goNext = () => {
+    if (pendingOption) return;
+    const nextAnswers = {
+      ...answers,
+      [current.id]: getCurrentAnswer(current, answers),
+    };
+    setAnswers(nextAnswers);
+    if (index === questions.length - 1) {
+      updateData(getQuizSharedData(nextAnswers));
+    }
+    setIndex((currentIndex) => currentIndex + 1);
   };
 
   const goBack = () => {
@@ -133,7 +174,7 @@ export default function QuizPage() {
       <section className="quiz-card">
         <div className="quiz-topline">
           <button type="button" onClick={goBack} disabled={index === 0}>
-            ← 返回
+            ← 上一题
           </button>
           <span>
             {index + 1} / {questions.length}
@@ -145,28 +186,83 @@ export default function QuizPage() {
         <p className="quiz-kicker">快速测试</p>
         <h1>{current.title}</h1>
         {current.hint && <p className="quiz-hint">{current.hint}</p>}
-        <div className="quiz-options">
-          {current.options.map((option) => (
-            <button
-              className={pendingOption === option || answers[current.id] === option ? "selected" : ""}
-              disabled={!!pendingOption}
-              key={option}
-              onClick={() => choose(option)}
-            >
-              {option}
+        {current.type === "number" ? (
+          <>
+            <QuizNumberInput
+              question={current}
+              value={getCurrentAnswer(current, answers)}
+              onChange={setNumberAnswer}
+            />
+            <button className="quiz-next-button" type="button" onClick={goNext}>
+              下一题 →
             </button>
-          ))}
-        </div>
+          </>
+        ) : (
+          <div className="quiz-options">
+            {current.options.map((option) => (
+              <button
+                className={pendingOption === option || answers[current.id] === option ? "selected" : ""}
+                disabled={!!pendingOption}
+                key={option}
+                onClick={() => choose(option)}
+              >
+                {option}
+              </button>
+            ))}
+          </div>
+        )}
       </section>
     </main>
   );
 }
 
+function QuizNumberInput({ question, value, onChange }) {
+  const update = (nextValue) => {
+    onChange(Math.min(question.max, Math.max(question.min, nextValue)));
+  };
+
+  return (
+    <div className="quiz-number-wrap">
+      <div className="quiz-number-row">
+        <button className="quiz-number-button" type="button" onClick={() => update(value - (question.step || 1))}>
+          −
+        </button>
+        <div className="quiz-number-display">
+          <div className="quiz-number-value">{value}</div>
+          <div className="quiz-number-unit">{question.unit}</div>
+        </div>
+        <button className="quiz-number-button" type="button" onClick={() => update(value + (question.step || 1))}>
+          +
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function getCurrentAnswer(question, answers) {
+  return answers[question.id] ?? question.defaultValue;
+}
+
+function getMappedValue(options, option, values) {
+  const index = options.indexOf(option);
+  return index >= 0 ? values[index] : undefined;
+}
+
+function getQuizSharedData(answers) {
+  return {
+    age: Number(answers.age) || questions[0].defaultValue,
+    fire_age: Number(answers.retireAge) || questions[1].defaultValue,
+    financial_assets: (Number(answers.assets) || questions[2].defaultValue) * 10000,
+    monthly_income: Number(answers.income) || questions[3].defaultValue,
+    retire_expense: getMappedValue(questions[4].options, answers.spending, [3000, 6000, 12000, 25000, 40000]),
+  };
+}
+
 function getResult(answers) {
   const highSavings = isHighSavings(answers.income, answers.spending);
-  const highIncome = ["40-80万", "80万以上"].includes(answers.income);
-  const hasAssets = ["50-150万", "150-500万", "500万以上"].includes(answers.assets);
-  const young = ["25岁以下", "25-30岁"].includes(answers.age);
+  const highIncome = Number(answers.income) >= 35000;
+  const hasAssets = Number(answers.assets) >= 50;
+  const young = Number(answers.age) <= 30;
 
   if (answers.lifestyle === "做点喜欢的事或兼职，不完全靠投资" || answers.workState === "做份轻松的兼职，保持社交") return "Barista";
   if (answers.lifestyle === "比现在更好，旅行美食不将就" && highIncome) return "Fat";
@@ -176,7 +272,8 @@ function getResult(answers) {
 }
 
 function isHighSavings(income, spending) {
-  const incomeRank = ["10万以下", "10-20万", "20-40万", "40-80万", "80万以上"].indexOf(income);
+  const monthlyIncome = Number(income) || 0;
+  const incomeRank = monthlyIncome >= 80000 ? 4 : monthlyIncome >= 40000 ? 3 : monthlyIncome >= 20000 ? 2 : monthlyIncome >= 10000 ? 1 : 0;
   const spendingRank = ["5万以下", "5-10万", "10-20万", "20-40万", "40万以上"].indexOf(spending);
   return incomeRank >= 2 && spendingRank <= 1;
 }

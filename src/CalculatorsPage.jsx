@@ -59,8 +59,8 @@ export default function CalculatorsPage() {
           <h2>不知道从哪里开始？</h2>
           <p>回答几个问题，我们帮你找到最适合的路径</p>
         </div>
-        <Link className="banner-action" to="/questionnaire">
-          开始深度评估 →
+        <Link className="banner-action" to="/quiz">
+          去快速测试 →
         </Link>
       </section>
     </main>
