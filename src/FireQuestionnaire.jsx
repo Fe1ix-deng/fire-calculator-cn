@@ -822,6 +822,10 @@ const isAnswered = (q, answers) => {
 const getVisible = answers => Qs.filter(q => q.cond(answers));
 
 const currentYear = new Date().getFullYear();
+const FIRE_TARGET_YEAR_LIMIT = 80;
+const PENSION_COVERED_REPORT_TITLE = "养老金已可覆盖退休支出，理论上无需额外积累";
+const UNREACHABLE_REPORT_TITLE = "当前路径难以达成";
+const UNREACHABLE_REPORT_SUBTITLE = "按当前储蓄与收益假设，长期内难以达到 FIRE 目标，建议提高储蓄率或下调目标支出。";
 
 const getDefault = id => Qs.find(q => q.id === id)?.def ?? 0;
 const getAmount = (answers, id) => Number(answers[id] ?? getDefault(id)) || 0;
@@ -846,42 +850,57 @@ const getExpectedReturn = answers => {
 
 const getExpectedReturnPercent = answers => Math.round(getExpectedReturn(answers) * 100);
 
+const getPensionMonthly = answers => {
+  const pensionCoverRates = {
+    "20%以下": 0.1,
+    "20-40%": 0.3,
+    "40%以上": 0.5,
+  };
+  return Math.round(getAmount(answers, "retire_exp") * (pensionCoverRates[answers.pension_cover] ?? 0));
+};
+
 const calcYearsToTarget = ({ currentAssets, monthlySavings, target, annualReturn }) => {
   if (target <= 0 || currentAssets >= target) return 0;
   const monthlyReturn = annualReturn / 12;
   let assets = Math.max(0, currentAssets);
-  for (let month = 1; month <= 960; month += 1) {
+  for (let month = 1; month <= FIRE_TARGET_YEAR_LIMIT * 12; month += 1) {
     assets = assets * (1 + monthlyReturn) + monthlySavings;
     if (assets >= target) return month / 12;
   }
-  return 80;
+  return FIRE_TARGET_YEAR_LIMIT;
 };
 
 const getReport = answers => {
   const retireExp = getAmount(answers, "retire_exp");
-  const fireTarget = retireExp * 12 / 0.04;
+  const pensionMonthly = getPensionMonthly(answers);
+  const monthlyGap = Math.max(0, retireExp - pensionMonthly);
+  const fireTarget = monthlyGap * 12 / 0.04;
   const propertyValue = getAmount(answers, "prop_val");
   const propertyDebt = answers.prop_cnt?.includes("有房贷") ? getAmount(answers, "prop_debt") : 0;
   const propertyNet = answers.prop_cnt && answers.prop_cnt !== "没有"
     ? Math.max(0, propertyValue - propertyDebt)
     : 0;
   const currentAssets = getAmount(answers, "fin_assets") + getAmount(answers, "gjj_bal") + propertyNet;
-  const monthlySavings = getAmount(answers, "income") - sumExpenses(answers.expenses);
+  const monthlyInvest = getAmount(answers, "monthly_invest");
+  const monthlySavings = monthlyInvest || getAmount(answers, "income") - sumExpenses(answers.expenses);
   const years = calcYearsToTarget({
     currentAssets,
     monthlySavings,
     target: fireTarget,
     annualReturn: getExpectedReturn(answers),
   });
+  const isUnreachable = years >= FIRE_TARGET_YEAR_LIMIT;
   const yearsRounded = Math.ceil(years);
   const age = getAmount(answers, "age");
   const fireAge = age + yearsRounded;
-  const progress = fireTarget > 0 ? Math.min(999, Math.round(currentAssets / fireTarget * 100)) : 0;
+  const progress = fireTarget > 0 ? Math.min(100, Math.round(currentAssets / fireTarget * 100)) : 0;
 
   return {
     fireTarget,
     currentAssets,
     monthlySavings,
+    isPensionCovered: monthlyGap <= 0,
+    isUnreachable,
     yearsRounded,
     fireAge,
     fireYear: currentYear + yearsRounded,
@@ -890,23 +909,25 @@ const getReport = answers => {
 };
 
 const getQuestionnaireSharedData = answers => {
+  const retireExp = getAmount(answers, "retire_exp");
   const propertyValue = getAmount(answers, "prop_val");
   const propertyDebt = answers.prop_cnt?.includes("有房贷") ? getAmount(answers, "prop_debt") : 0;
   const propertyNet = answers.prop_cnt && answers.prop_cnt !== "没有"
     ? Math.max(0, propertyValue - propertyDebt)
     : 0;
+  const monthlyInvest = getAmount(answers, "monthly_invest");
 
   return {
     age: getAmount(answers, "age"),
     fire_age: getAmount(answers, "fire_age"),
     monthly_income: getAmount(answers, "income"),
-    monthly_savings: getAmount(answers, "income") - sumExpenses(answers.expenses),
-    retire_expense: getAmount(answers, "retire_exp"),
+    monthly_savings: monthlyInvest || getAmount(answers, "income") - sumExpenses(answers.expenses),
+    retire_expense: retireExp,
     financial_assets: getAmount(answers, "fin_assets"),
     gjj_balance: getAmount(answers, "gjj_bal"),
     property_net: propertyNet,
     expected_return: getExpectedReturnPercent(answers),
-    pension_monthly: 0,
+    pension_monthly: getPensionMonthly(answers),
   };
 };
 
@@ -1137,9 +1158,19 @@ function ReportPage({ report, risks, onRestart, onCalculator }) {
       <main className="report-wrap">
         <section>
           <div className="report-kicker">你的 FIRE 评估报告</div>
-          <h1 className="report-title">你大约在 {report.fireAge} 岁实现财务自由</h1>
+          <h1 className="report-title">
+            {report.isPensionCovered
+              ? PENSION_COVERED_REPORT_TITLE
+              : report.isUnreachable
+                ? UNREACHABLE_REPORT_TITLE
+                : `你大约在 ${report.fireAge} 岁实现财务自由`}
+          </h1>
           <p className="report-subtitle">
-            还需要约 {report.yearsRounded} 年，预计 {report.fireYear} 年
+            {report.isPensionCovered
+              ? "当前口径下，养老金抵减后 FIRE 目标金额为 0。"
+              : report.isUnreachable
+                ? UNREACHABLE_REPORT_SUBTITLE
+                : `还需要约 ${report.yearsRounded} 年，预计 ${report.fireYear} 年`}
           </p>
         </section>
 

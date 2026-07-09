@@ -1,6 +1,8 @@
 node_modules
 dist
 .vite
+.DS_Store
+pnpm-lock.yaml
 npm-debug.log*
 vite-dev*.log
 /fire-questionnaire.jsx

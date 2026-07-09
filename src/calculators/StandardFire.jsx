@@ -12,35 +12,37 @@ import {
 import { useAppData } from "../AppContext.jsx";
 
 const currentYear = new Date().getFullYear();
+const FIRE_SEARCH_MONTH_LIMIT = 1200;
+const UNREACHABLE_FIRE_MESSAGE = "按当前储蓄率与收益率，长期内难以达到 FIRE 目标，建议提高储蓄率或下调目标支出";
 
 const presets = [
   {
     id: "conservative",
     icon: "🐢",
     name: "保守型",
-    desc: "储蓄率15%，收益率5%，提取率3.5%",
-    values: { monthlyIncome: 30000, savingsRate: 15, annualReturn: 5, withdrawalRate: 3.5 },
+    desc: "储蓄率15%，实际收益率2%，提取率3.5%",
+    values: { monthlyIncome: 30000, savingsRate: 15, annualReturn: 2, withdrawalRate: 3.5 },
   },
   {
     id: "steady",
     icon: "📈",
     name: "稳健型",
-    desc: "储蓄率25%，收益率6%，提取率4%",
-    values: { monthlyIncome: 30000, savingsRate: 25, annualReturn: 6, withdrawalRate: 4 },
+    desc: "储蓄率25%，实际收益率3%，提取率4%",
+    values: { monthlyIncome: 30000, savingsRate: 25, annualReturn: 3, withdrawalRate: 4 },
   },
   {
     id: "aggressive",
     icon: "🚀",
     name: "积极型",
-    desc: "储蓄率40%，收益率7%，提取率4%",
-    values: { monthlyIncome: 30000, savingsRate: 40, annualReturn: 7, withdrawalRate: 4 },
+    desc: "储蓄率40%，实际收益率4%，提取率4%",
+    values: { monthlyIncome: 30000, savingsRate: 40, annualReturn: 4, withdrawalRate: 4 },
   },
   {
     id: "fat",
     icon: "💎",
     name: "富裕退休",
-    desc: "高收入高支出，收益率6%，提取率3%",
-    values: { monthlyIncome: 50000, savingsRate: 40, retirementMonthlyExpense: 22000, annualReturn: 6, withdrawalRate: 3 },
+    desc: "高收入高支出，实际收益率3%，提取率3%",
+    values: { monthlyIncome: 50000, savingsRate: 40, retirementMonthlyExpense: 22000, annualReturn: 3, withdrawalRate: 3 },
   },
 ];
 
@@ -51,8 +53,7 @@ const initialValues = {
   monthlyIncome: 0,
   savingsRate: 30,
   retirementMonthlyExpense: 10000,
-  annualReturn: 6,
-  inflationRate: 3,
+  annualReturn: 4,
   withdrawalRate: 4,
   monthlyPension: 0,
   includePropertyEquity: false,
@@ -91,6 +92,8 @@ export default function StandardFire() {
         <p className="progress-note">
           {result.isFireReady
             ? "你现在就可以退休了"
+            : result.isUnreachable
+              ? UNREACHABLE_FIRE_MESSAGE
             : `还需 ${result.yearsToFire} 年 ${result.monthsToFire} 个月，预计 ${result.fireYear} 年实现`}
         </p>
       </section>
@@ -144,8 +147,14 @@ export default function StandardFire() {
               hint="通常为当前月支出的70%-100%，可根据理想生活自行调整"
               onChange={(value) => update("retirementMonthlyExpense", value)}
             />
-            <SliderField label="预期年化收益率" min={1} max={25} value={values.annualReturn} onChange={(value) => update("annualReturn", value)} />
-            <SliderField label="预期通胀率" min={1} max={8} value={values.inflationRate} onChange={(value) => update("inflationRate", value)} />
+            <SliderField
+              label="预期实际年化收益率"
+              min={1}
+              max={25}
+              value={values.annualReturn}
+              hint="已扣除通胀，即真实购买力的年增长率"
+              onChange={(value) => update("annualReturn", value)}
+            />
             <SliderField label="安全提取率" min={2} max={6} value={values.withdrawalRate} onChange={(value) => update("withdrawalRate", value)} />
           </div>
 
@@ -168,10 +177,13 @@ export default function StandardFire() {
         <div className="result-stack">
           <div className="metric-cards">
             <MetricCard label="FIRE目标金额" value={formatWan(result.fireTarget)} accent />
-            <MetricCard label="距离FIRE年数" value={result.isFireReady ? "现在可退休" : `${result.totalYearsToFire} 年`} />
+            <MetricCard
+              label="距离FIRE年数"
+              value={result.isFireReady ? "现在可退休" : result.isUnreachable ? "难以达成" : `${result.totalYearsToFire} 年`}
+            />
             <MetricCard label="当前储蓄率" value={formatOptionalPercent(result.savingsRate)} />
           </div>
-          <GoalComparisonCard targetAge={toNumber(values.targetRetirementAge)} actualAge={result.fireAge} />
+          <GoalComparisonCard targetAge={toNumber(values.targetRetirementAge)} actualAge={result.fireAge} isUnreachable={result.isUnreachable} />
           <div className="fire-card explanation-card inline-explanation">
             <h2>读懂你的结果</h2>
             {result.isPensionCovered ? (
@@ -181,12 +193,19 @@ export default function StandardFire() {
                 你的当前资产已经达到 FIRE 目标金额 {formatWan(result.fireTarget)}。按当前资产和退休后每月支出{" "}
                 {formatMoney(values.retirementMonthlyExpense)} 测算，{result.withdrawalText}。
               </p>
+            ) : result.isUnreachable ? (
+              <p>{UNREACHABLE_FIRE_MESSAGE}。</p>
             ) : (
               <p>
                 你的 FIRE 目标金额为 {formatWan(result.fireTarget)}。按当前储蓄率 {values.savingsRate}%、
                 每月储蓄 {formatMoney(result.monthlySavings)}、实际收益率 {formatPercent(result.realAnnualReturn * 100)} 计算，预计在{" "}
                 {result.fireAge} 岁（{result.fireYear} 年）实现财务自由，还需要 {result.yearsToFire} 年{" "}
-                {result.monthsToFire} 个月。<span className="sustainability-note">退休后预计可持续：终身（按4%法则）。</span>
+                {result.monthsToFire} 个月。
+                <span className="sustainability-note">
+                  {result.isPerpetual
+                    ? "退休后本金预计可永续（实际收益率≥提取率）"
+                    : `退休后本金将随时间消耗，提取率${result.withdrawalRate}%高于实际收益率，需留意长寿风险`}
+                </span>
               </p>
             )}
           </div>
@@ -257,7 +276,7 @@ function NumberField({ label, unit, value, hint, onChange }) {
   );
 }
 
-function SliderField({ label, min, max, value, onChange }) {
+function SliderField({ label, min, max, value, hint, onChange }) {
   return (
     <label className="fire-field slider-field">
       <span>
@@ -276,6 +295,7 @@ function SliderField({ label, min, max, value, onChange }) {
         <small>{min}%</small>
         <small>{max}%</small>
       </div>
+      {hint && <em>{hint}</em>}
     </label>
   );
 }
@@ -331,9 +351,9 @@ function PropertyEquityField({ checked, value, onCheckedChange, onValueChange })
   );
 }
 
-function GoalComparisonCard({ targetAge, actualAge }) {
-  const yearsBehind = Math.max(0, actualAge - targetAge);
-  const onTrack = actualAge <= targetAge;
+function GoalComparisonCard({ targetAge, actualAge, isUnreachable = false }) {
+  const yearsBehind = isUnreachable ? 0 : Math.max(0, actualAge - targetAge);
+  const onTrack = !isUnreachable && actualAge <= targetAge;
 
   return (
     <div className="fire-card goal-comparison-card">
@@ -344,11 +364,11 @@ function GoalComparisonCard({ targetAge, actualAge }) {
         </div>
         <div>
           <span>按当前数据</span>
-          <strong>{actualAge}岁</strong>
+          <strong>{isUnreachable ? "难以达成" : `${actualAge}岁`}</strong>
         </div>
       </div>
       <p className={onTrack ? "goal-status on-track" : "goal-status behind"}>
-        {onTrack ? "✓ 你有望提前达成目标" : `还需努力 ${yearsBehind} 年才能达到目标`}
+        {isUnreachable ? "当前路径长期内难以达到目标" : onTrack ? "✓ 你有望提前达成目标" : `还需努力 ${yearsBehind} 年才能达到目标`}
       </p>
     </div>
   );
@@ -405,7 +425,6 @@ function calculateFire(values) {
     savingsRate: toNumber(values.savingsRate),
     retirementMonthlyExpense: toNumber(values.retirementMonthlyExpense),
     annualReturn: toNumber(values.annualReturn),
-    inflationRate: toNumber(values.inflationRate),
     withdrawalRate: toNumber(values.withdrawalRate),
     monthlyPension: toNumber(values.monthlyPension),
     includePropertyEquity: Boolean(values.includePropertyEquity),
@@ -419,34 +438,45 @@ function calculateFire(values) {
   const progressPercent = fireTarget > 0 ? Math.min(100, (totalStartingAssets / fireTarget) * 100) : 100;
   const isFireReady = totalStartingAssets >= fireTarget;
   const isPensionCovered = monthlyGap <= 0;
-  const realAnnualReturn = ((1 + numericValues.annualReturn / 100) / (1 + numericValues.inflationRate / 100)) - 1;
+  const realAnnualReturn = numericValues.annualReturn / 100;
+  const isPerpetual = realAnnualReturn >= numericValues.withdrawalRate / 100;
   const realMonthlyReturn = Math.pow(1 + realAnnualReturn, 1 / 12) - 1;
   const monthsToFire = isFireReady ? 0 : findMonthsToFire(totalStartingAssets, monthlySavings, fireTarget, realMonthlyReturn);
+  const isUnreachable = !isFireReady && monthsToFire >= FIRE_SEARCH_MONTH_LIMIT;
   const totalYearsToFire = Math.floor(monthsToFire / 12);
   const remainingMonths = monthsToFire % 12;
-  const fireAge = numericValues.age + totalYearsToFire + Math.round(remainingMonths / 12);
-  const fireYear = currentYear + totalYearsToFire + Math.ceil(remainingMonths / 12);
+  const yearsRounded = Math.round(monthsToFire / 12);
+  const fireAge = numericValues.age + yearsRounded;
+  const fireYear = currentYear + yearsRounded;
   const savingsRate = numericValues.monthlyIncome > 0 ? monthlySavings / numericValues.monthlyIncome : null;
-  const withdrawal = estimateWithdrawalYears(totalStartingAssets, annualGap, numericValues.annualReturn / 100, numericValues.inflationRate / 100);
+  const withdrawal = estimateWithdrawalYears(totalStartingAssets, annualGap, realAnnualReturn);
   const chartData = isFireReady
     ? buildRetirementChartData(numericValues, totalStartingAssets)
-    : buildAccumulationChartData({ ...numericValues, monthlySavings }, totalStartingAssets, fireTarget, fireAge);
+    : buildAccumulationChartData(
+      { ...numericValues, monthlySavings },
+      totalStartingAssets,
+      fireTarget,
+      isUnreachable ? numericValues.age + FIRE_SEARCH_MONTH_LIMIT / 12 : fireAge
+    );
 
   return {
     monthlyGap,
     monthlySavings,
     fireTarget,
+    withdrawalRate: numericValues.withdrawalRate,
     totalStartingAssets,
     progressPercent,
     realAnnualReturn,
+    isPerpetual,
     isFireReady,
+    isUnreachable,
     isPensionCovered,
     chartMode: isFireReady ? "retirement" : "accumulation",
     yearsToFire: totalYearsToFire,
     monthsToFire: remainingMonths,
     totalYearsToFire,
-    fireAge,
-    fireYear,
+    fireAge: isUnreachable ? null : fireAge,
+    fireYear: isUnreachable ? null : fireYear,
     savingsRate,
     withdrawalYears: withdrawal.years,
     withdrawalText: withdrawal.text,
@@ -456,21 +486,21 @@ function calculateFire(values) {
 
 function findMonthsToFire(startingAssets, monthlySavings, target, monthlyReturn) {
   if (startingAssets >= target) return 0;
-  if (monthlySavings <= 0 && monthlyReturn <= 0) return 1200;
+  if (monthlySavings <= 0 && monthlyReturn <= 0) return FIRE_SEARCH_MONTH_LIMIT;
 
   let assets = startingAssets;
-  for (let month = 1; month <= 1200; month += 1) {
+  for (let month = 1; month <= FIRE_SEARCH_MONTH_LIMIT; month += 1) {
     assets = assets * (1 + monthlyReturn) + monthlySavings;
     if (assets >= target) return month;
   }
-  return 1200;
+  return FIRE_SEARCH_MONTH_LIMIT;
 }
 
 function buildAccumulationChartData(values, startingAssets, fireTarget, fireAge) {
   const endAge = Math.min(100, Math.max(values.age + 10, fireAge + 10));
   const rows = [];
   let realAssets = startingAssets;
-  const realMonthlyReturn = Math.pow(1 + (((1 + values.annualReturn / 100) / (1 + values.inflationRate / 100)) - 1), 1 / 12) - 1;
+  const realMonthlyReturn = Math.pow(1 + values.annualReturn / 100, 1 / 12) - 1;
 
   for (let age = values.age; age <= endAge; age += 1) {
     rows.push({
@@ -490,7 +520,7 @@ function buildAccumulationChartData(values, startingAssets, fireTarget, fireAge)
 function buildRetirementChartData(values, startingAssets) {
   const rows = [];
   let realAssets = startingAssets;
-  const realAnnualReturn = ((1 + values.annualReturn / 100) / (1 + values.inflationRate / 100)) - 1;
+  const realAnnualReturn = values.annualReturn / 100;
   const realMonthlyReturn = Math.pow(1 + realAnnualReturn, 1 / 12) - 1;
   const monthlyWithdrawal = Math.max(0, values.retirementMonthlyExpense - values.monthlyPension);
 
@@ -512,16 +542,15 @@ function buildRetirementChartData(values, startingAssets) {
   return rows;
 }
 
-function estimateWithdrawalYears(startingAssets, annualExpense, annualReturn, inflationRate) {
+function estimateWithdrawalYears(startingAssets, annualExpense, realAnnualReturn) {
   if (annualExpense <= 0) return { years: 99, text: "可持续：无限期" };
-  const realReturn = annualReturn - inflationRate;
-  if (realReturn > 0 && startingAssets * realReturn > annualExpense) {
+  if (realAnnualReturn > 0 && startingAssets * realAnnualReturn > annualExpense) {
     return { years: Infinity, text: "可持续：无限期" };
   }
 
   let assets = startingAssets;
   for (let year = 1; year <= 99; year += 1) {
-    assets = assets * (1 + realReturn) - annualExpense;
+    assets = assets * (1 + realAnnualReturn) - annualExpense;
     if (assets <= 0) return { years: year, text: `可持续：${year}年` };
   }
   return { years: 99, text: "可持续：99年以上" };
